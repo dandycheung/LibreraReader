@@ -305,6 +305,7 @@ dependencies {
     implementation(libs.work.runtime)
     implementation(libs.legacy.support.v4)
     implementation(libs.appcompat)
+    implementation(libs.androidx.media)
 
     implementation(libs.eventbus)
     implementation(libs.greenrobot.greendao)
