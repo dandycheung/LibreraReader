@@ -15,6 +15,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.widget.RemoteViews;
+import android.support.v4.media.session.MediaSessionCompat;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -63,6 +64,7 @@ public class TTSNotification {
     static int pageCount;
 
     private static Context context;
+    public static MediaSessionCompat.Token sessionToken;
     static Runnable run = new Runnable() {
 
         @Override
@@ -94,6 +96,10 @@ public class TTSNotification {
     }
 
     public static void show(String bookPath, int page, int maxPages) {
+        if (TxtUtils.isEmpty(bookPath)) {
+            LOG.d("TTSNotification show skip – empty path");
+            return;
+        }
         bookPath1 = bookPath;
         page1 = page;
         pageCount = maxPages;
@@ -116,8 +122,6 @@ public class TTSNotification {
             PendingIntent contentIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE);
 
             PendingIntent playPause = PendingIntent.getService(context, 0, new Intent(TTS_PLAY_PAUSE, null, context, TTSService.class), PendingIntent.FLAG_IMMUTABLE);
-            PendingIntent pause = PendingIntent.getService(context, 0, new Intent(TTS_PAUSE, null, context, TTSService.class), PendingIntent.FLAG_IMMUTABLE);
-            PendingIntent play = PendingIntent.getService(context, 0, new Intent(TTS_PLAY, null, context, TTSService.class), PendingIntent.FLAG_IMMUTABLE);
             PendingIntent next = PendingIntent.getService(context, 0, new Intent(TTS_NEXT, null, context, TTSService.class), PendingIntent.FLAG_IMMUTABLE);
             PendingIntent prev = PendingIntent.getService(context, 0, new Intent(TTS_PREV, null, context, TTSService.class), PendingIntent.FLAG_IMMUTABLE);
             PendingIntent stopDestroy = PendingIntent.getService(context, 0, new Intent(TTS_STOP_DESTROY, null, context, TTSService.class), PendingIntent.FLAG_IMMUTABLE);
@@ -150,7 +154,7 @@ public class TTSNotification {
             remoteViews.setViewVisibility(R.id.ttsDialog, View.GONE);
             remoteViewsSmall.setViewVisibility(R.id.ttsDialog, View.GONE);
 
-            if (TTSEngine.get().isPlaying()) {
+            if (TTSService.isPlaying) {
                 remoteViews.setImageViewResource(R.id.ttsPlay, R.drawable.glyphicons_174_pause);
                 remoteViewsSmall.setImageViewResource(R.id.ttsPlay, R.drawable.glyphicons_174_pause);
             } else {
@@ -202,13 +206,22 @@ public class TTSNotification {
                     remoteViews.setImageViewBitmap(R.id.ttsIcon, resource);
                     remoteViewsSmall.setImageViewBitmap(R.id.ttsIcon, resource);
 
+                    androidx.media.app.NotificationCompat.MediaStyle mediaStyle = new androidx.media.app.NotificationCompat.MediaStyle();
+                    if (sessionToken != null) {
+                        mediaStyle.setMediaSession(sessionToken);
+                        mediaStyle.setShowActionsInCompactView(1); // Play/Pause button index
+                    }
+
                     builder.setContentIntent(contentIntent) //
                             .setSmallIcon(R.drawable.glyphicons_smileys_100_headphones) //
                             .setColor(color)
                             .setOngoing(true)//
                             .setPriority(NotificationCompat.PRIORITY_HIGH) //
                             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)//
-                            .setStyle(new androidx.media.app.NotificationCompat.MediaStyle())
+                            .addAction(R.drawable.glyphicons_173_rewind, "Prev", prev) // 0
+                            .addAction(TTSService.isPlaying ? R.drawable.glyphicons_174_pause : R.drawable.glyphicons_175_play, "Play/Pause", playPause) // 1
+                            .addAction(R.drawable.glyphicons_177_forward, "Next", next) // 2
+                            .setStyle(mediaStyle)
                             .setSilent(true)
                             .setCustomBigContentView(remoteViews) ///
                             .setCustomContentView(remoteViewsSmall); ///
@@ -252,7 +265,9 @@ public class TTSNotification {
         if (TTSEngine.get().isShutdown()) {
             hideNotification();
         } else if (handler != null) {
-            handler.postDelayed(run, 500);
+            // Debounce refresh to avoid play/pause icon desync.
+            handler.removeCallbacks(run);
+            handler.postDelayed(run, 200);
         }
 
     }

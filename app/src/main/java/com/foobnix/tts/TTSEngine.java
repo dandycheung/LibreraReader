@@ -76,7 +76,6 @@ public class TTSEngine {
                 Toast.makeText(LibreraApp.context, R.string.msg_unexpected_error, Toast.LENGTH_LONG)
                      .show();
             }
-
         }
     };
     private String text = "";
@@ -183,9 +182,6 @@ public class TTSEngine {
     }
 
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1) public void stop(MediaSessionCompat mediaSessionCompat) {
-        if (mediaSessionCompat != null) {
-            mediaSessionCompat.setActive(false);
-        }
         if (!AppState.get().allowOtherMusic) {
             try {
 
@@ -570,11 +566,13 @@ public class TTSEngine {
     }
 
     public void mp3Next() {
+        if (mp == null) return;
         int seek = mp.getCurrentPosition();
         mp.seekTo(seek + 5 * 1000);
     }
 
     public void mp3Prev() {
+        if (mp == null) return;
         int seek = mp.getCurrentPosition();
         mp.seekTo(seek - 5 * 1000);
     }
